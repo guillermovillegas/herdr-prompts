@@ -1,0 +1,12 @@
+id = "paulchess.workspace-list"
+name = "Workspace List"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "List all workspaces in the current Herdr session."
+platforms = ["linux", "macos", "windows"]
+
+[[actions]]
+id = "list-workspaces"
+title = "List all workspaces"
+contexts = ["workspace"]
+command = ["node", "index.cjs"]

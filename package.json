@@ -1,0 +1,28 @@
+{
+  "name": "first-herdr-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsup && node scripts/prepare-dist.mjs",
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "plugin:invoke": "herdr plugin action invoke paulchess.workspace-list.list-workspaces",
+    "plugin:link": "pnpm build && herdr plugin link dist",
+    "plugin:logs": "herdr plugin log list --plugin paulchess.workspace-list",
+    "plugin:unlink": "herdr plugin unlink paulchess.workspace-list",
+    "start": "node dist/index.cjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.21.0",
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsup": "^8.5.1",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  }
+}
