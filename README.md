@@ -2,9 +2,33 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-Herdr Prompts is a keyboard-first prompt library for [Herdr](https://herdr.dev). Save reusable prompts, search them with case-insensitive substring matching, fill template variables, and insert the result into a Codex, Claude Code, OpenCode, or other Agent input—without submitting it.
+**Save once. Find fast. Fill variables. Send to any Agent input.**
 
-The plugin is local-first: prompts stay on your machine, and it makes no network requests or telemetry calls.
+Herdr Prompts is a keyboard-first prompt library for [Herdr](https://herdr.dev). It keeps reusable instructions one shortcut away from Codex, Claude Code, OpenCode, and other Agents—then inserts the selected text without submitting it.
+
+![Herdr Prompts library and preview](assets/prompt-library.png)
+
+## Why Herdr Prompts
+
+- **Build a reusable library.** Create, edit, preview, and delete multiline prompts without leaving Herdr.
+- **Find prompts quickly.** Type any part of a prompt to filter the library with case-insensitive substring matching.
+- **Turn prompts into templates.** Add `{{variables}}`, fill them for one use, and keep the saved template unchanged.
+- **Stay in control.** Insert into the focused Agent input without pressing Enter.
+- **Keep everything local.** Prompt data stays on your machine; there are no network requests or telemetry calls.
+
+## See it in action
+
+### Create reusable prompts
+
+Write ordinary text, multiline instructions, Chinese, emoji, or templates. Press `Ctrl+S` to save.
+
+![Creating a reusable prompt](assets/create-prompt.png)
+
+### Fill variables before insertion
+
+Selecting a template opens a one-off editor and shows every unresolved variable. Replace them, press `Ctrl+S`, and the completed prompt is inserted into the original Agent input.
+
+![Filling prompt template variables](assets/template-fill.png)
 
 inspired by my friend: bingguanqi
 
@@ -28,7 +52,7 @@ Herdr 0.8 does not display plugin actions in the pane context menu. To give the 
 
 ```toml
 [[keys.command]]
-key = "prefix+alt+p"
+key = "prefix+u"
 type = "plugin_action"
 command = "oppenheimor.herdr-prompts.open"
 description = "Open prompt picker"
@@ -40,7 +64,7 @@ Reload the configuration after editing it:
 herdr server reload-config
 ```
 
-Focus the destination Agent pane, then press your configured shortcut. With Herdr's default prefix, the example above means `Ctrl+B`, followed by `Alt+P`.
+Focus the destination Agent pane, then press your configured shortcut. With Herdr's default prefix, the example above means `Ctrl+B`, followed by `u`.
 
 You can also invoke the installed action from a Herdr-managed terminal after focusing the destination Agent pane:
 

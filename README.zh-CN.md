@@ -2,9 +2,33 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md)
 
-Herdr Prompts 是一款为 [Herdr](https://herdr.dev) 打造的键盘优先 Prompt 库。你可以保存常用 Prompt、通过不区分大小写的全文子串搜索找到它们、填写模板变量，并把结果插入 Codex、Claude Code、OpenCode 或其他 Agent 的输入框——不会自动提交。
+**一次保存，快速找到，填写变量，插入任意 Agent 输入框。**
 
-插件完全本地运行：Prompt 只保存在你的机器上，不发起网络请求，也不收集遥测数据。
+Herdr Prompts 是一款为 [Herdr](https://herdr.dev) 打造的键盘优先 Prompt 库。它让常用指令始终离 Codex、Claude Code、OpenCode 和其他 Agent 只有一个快捷键的距离，并把选中的文本插入输入框——不会自动提交。
+
+![Herdr Prompts 的 Prompt 库与预览](assets/prompt-library.png)
+
+## 为什么使用 Herdr Prompts
+
+- **建立可复用的 Prompt 库。** 无需离开 Herdr，即可新建、编辑、预览和删除多行 Prompt。
+- **快速找到需要的 Prompt。** 输入任意内容片段，即可通过不区分大小写的全文子串匹配过滤列表。
+- **把 Prompt 变成模板。** 使用 `{{变量}}`，每次调用时填写，已保存的原模板保持不变。
+- **始终由你决定何时发送。** 只插入当前 Agent 输入框，绝不替你按 Enter。
+- **数据完全留在本机。** 不发起网络请求，也不收集遥测数据。
+
+## 使用过程
+
+### 新建常用 Prompt
+
+支持普通文本、多行指令、中文、emoji 和模板。按 `Ctrl+S` 保存。
+
+![新建可复用 Prompt](assets/create-prompt.png)
+
+### 插入前填写模板变量
+
+选择模板后会进入一次性编辑器，并列出所有尚未替换的变量。填写完成后按 `Ctrl+S`，最终 Prompt 会被插入原 Agent 输入框。
+
+![填写 Prompt 模板变量](assets/template-fill.png)
 
 inspired by my friend: bingguanqi
 
@@ -28,7 +52,7 @@ Herdr 0.8 不会在 pane 右键菜单中展示插件 action。为了避免插件
 
 ```toml
 [[keys.command]]
-key = "prefix+alt+p"
+key = "prefix+u"
 type = "plugin_action"
 command = "oppenheimor.herdr-prompts.open"
 description = "Open prompt picker"
@@ -40,7 +64,7 @@ description = "Open prompt picker"
 herdr server reload-config
 ```
 
-先聚焦目标 Agent pane，再按配置的快捷键。使用 Herdr 默认 prefix 时，上面的示例表示先按 `Ctrl+B`，再按 `Alt+P`。
+先聚焦目标 Agent pane，再按配置的快捷键。使用 Herdr 默认 prefix 时，上面的示例表示先按 `Ctrl+B`，再按 `u`。
 
 也可以先聚焦目标 Agent pane，然后在 Herdr 管理的终端中调用已安装的 action：
 
