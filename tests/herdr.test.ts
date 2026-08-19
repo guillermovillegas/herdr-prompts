@@ -9,11 +9,10 @@ import {
 
 describe("openPickerAction", () => {
   it("opens a focused popup with the originating pane id", () => {
-    const run = vi.fn<RunCommand>(() => ({
-      stdout: '{"result":{"pane":{"pane_id":"w1:p9"}}}',
-      stderr: "",
-      status: 0,
-    }));
+    const run = vi
+      .fn<RunCommand>()
+      .mockReturnValueOnce(agentResult("idle"))
+      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 });
 
     openPickerAction(
       {
@@ -25,7 +24,12 @@ describe("openPickerAction", () => {
       run,
     );
 
-    expect(run).toHaveBeenCalledWith("/opt/herdr/bin/herdr", [
+    expect(run).toHaveBeenNthCalledWith(1, "/opt/herdr/bin/herdr", [
+      "agent",
+      "get",
+      "w1:p3",
+    ]);
+    expect(run).toHaveBeenNthCalledWith(2, "/opt/herdr/bin/herdr", [
       "plugin",
       "pane",
       "open",
@@ -41,6 +45,8 @@ describe("openPickerAction", () => {
       "70%",
       "--env",
       "HERDR_PROMPTS_TARGET_PANE_ID=w1:p3",
+      "--env",
+      "HERDR_PROMPTS_TARGET_AGENT_SESSION_ID=session-1",
       "--focus",
     ]);
   });
@@ -53,21 +59,14 @@ describe("HerdrClient", () => {
       const run = vi
         .fn<RunCommand>()
         .mockReturnValueOnce({
-          stdout: JSON.stringify({
-            result: {
-              agent: {
-                agent: "codex",
-                agent_status: agentStatus,
-                pane_id: "w1:p3",
-              },
-            },
-          }),
-          stderr: "",
-          status: 0,
+          ...agentResult(agentStatus),
         })
         .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 });
 
-      new HerdrClient("herdr", run).insertPrompt("w1:p3", "Review\nthis");
+      new HerdrClient("herdr", run).insertPrompt(
+        { paneId: "w1:p3", sessionId: "session-1" },
+        "Review\nthis",
+      );
 
       expect(run).toHaveBeenNthCalledWith(1, "herdr", [
         "agent",
@@ -84,23 +83,43 @@ describe("HerdrClient", () => {
   );
 
   it("refuses to write when the target Agent is not ready", () => {
-    const run = vi.fn<RunCommand>(() => ({
-      stdout: JSON.stringify({
-        result: {
-          agent: {
-            agent: "claude",
-            agent_status: "working",
-            pane_id: "w1:p3",
-          },
-        },
-      }),
-      stderr: "",
-      status: 0,
-    }));
+    const run = vi.fn<RunCommand>(() => agentResult("working"));
 
     expect(() =>
-      new HerdrClient("herdr", run).insertPrompt("w1:p3", "Do not send"),
+      new HerdrClient("herdr", run).insertPrompt(
+        { paneId: "w1:p3", sessionId: "session-1" },
+        "Do not send",
+      ),
     ).toThrow(new HerdrRuntimeError("Target Agent is working, not idle"));
     expect(run).toHaveBeenCalledTimes(1);
   });
+
+  it("refuses to write when the pane hosts a replacement Agent", () => {
+    const run = vi.fn<RunCommand>(() => agentResult("idle", "session-2"));
+
+    expect(() =>
+      new HerdrClient("herdr", run).insertPrompt(
+        { paneId: "w1:p3", sessionId: "session-1" },
+        "Do not send",
+      ),
+    ).toThrow("The target pane now hosts a different Agent");
+    expect(run).toHaveBeenCalledTimes(1);
+  });
 });
+
+function agentResult(status: string, sessionId = "session-1") {
+  return {
+    stdout: JSON.stringify({
+      result: {
+        agent: {
+          agent: "codex",
+          agent_session: { kind: "id", value: sessionId },
+          agent_status: status,
+          pane_id: "w1:p3",
+        },
+      },
+    }),
+    stderr: "",
+    status: 0,
+  };
+}

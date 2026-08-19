@@ -9,6 +9,11 @@ export interface CommandResult {
 
 export type RunCommand = (command: string, args: string[]) => CommandResult;
 
+export interface AgentTarget {
+  paneId: string;
+  sessionId: string;
+}
+
 export class HerdrRuntimeError extends Error {
   constructor(message: string) {
     super(message);
@@ -22,6 +27,7 @@ export function openPickerAction(
 ): void {
   const targetPaneId = originatingPaneId(env.HERDR_PLUGIN_CONTEXT_JSON);
   const herdrBin = env.HERDR_BIN_PATH ?? "herdr";
+  const target = inspectAgent(herdrBin, targetPaneId, run);
   const result = run(herdrBin, [
     "plugin",
     "pane",
@@ -38,6 +44,8 @@ export function openPickerAction(
     "70%",
     "--env",
     `HERDR_PROMPTS_TARGET_PANE_ID=${targetPaneId}`,
+    "--env",
+    `HERDR_PROMPTS_TARGET_AGENT_SESSION_ID=${target.sessionId}`,
     "--focus",
   ]);
   assertCommandSucceeded(result, "open the prompt picker");
@@ -49,16 +57,13 @@ export class HerdrClient {
     private readonly run: RunCommand,
   ) {}
 
-  insertPrompt(targetPaneId: string, content: string): void {
-    const infoResult = this.run(this.herdrBin, [
-      "agent",
-      "get",
-      targetPaneId,
-    ]);
-    assertCommandSucceeded(infoResult, "inspect the target Agent");
-    const agent = parseAgentInfo(infoResult.stdout);
-    if (agent.paneId !== targetPaneId) {
+  insertPrompt(target: AgentTarget, content: string): void {
+    const agent = inspectAgent(this.herdrBin, target.paneId, this.run);
+    if (agent.paneId !== target.paneId) {
       throw new HerdrRuntimeError("Herdr returned a different target pane");
+    }
+    if (agent.sessionId !== target.sessionId) {
+      throw new HerdrRuntimeError("The target pane now hosts a different Agent");
     }
     if (agent.status !== "idle" && agent.status !== "done") {
       throw new HerdrRuntimeError(
@@ -69,7 +74,7 @@ export class HerdrClient {
     const sendResult = this.run(this.herdrBin, [
       "pane",
       "send-text",
-      targetPaneId,
+      target.paneId,
       content,
     ]);
     assertCommandSucceeded(sendResult, "insert the prompt");
@@ -99,6 +104,7 @@ function originatingPaneId(serializedContext: string | undefined): string {
 
 function parseAgentInfo(serialized: string | null): {
   paneId: string;
+  sessionId: string;
   status: string;
 } {
   let response: unknown;
@@ -110,15 +116,33 @@ function parseAgentInfo(serialized: string | null): {
 
   const result = isRecord(response) ? response.result : undefined;
   const agent = isRecord(result) ? result.agent : undefined;
+  const agentSession = isRecord(agent) ? agent.agent_session : undefined;
   if (
     !isRecord(agent) ||
     typeof agent.agent !== "string" ||
     typeof agent.agent_status !== "string" ||
-    typeof agent.pane_id !== "string"
+    typeof agent.pane_id !== "string" ||
+    !isRecord(agentSession) ||
+    typeof agentSession.value !== "string" ||
+    agentSession.value.length === 0
   ) {
     throw new HerdrRuntimeError("The target pane no longer hosts an Agent");
   }
-  return { paneId: agent.pane_id, status: agent.agent_status };
+  return {
+    paneId: agent.pane_id,
+    sessionId: agentSession.value,
+    status: agent.agent_status,
+  };
+}
+
+function inspectAgent(
+  herdrBin: string,
+  paneId: string,
+  run: RunCommand,
+): ReturnType<typeof parseAgentInfo> {
+  const result = run(herdrBin, ["agent", "get", paneId]);
+  assertCommandSucceeded(result, "inspect the target Agent");
+  return parseAgentInfo(result.stdout);
 }
 
 function assertCommandSucceeded(

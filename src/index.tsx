@@ -32,6 +32,9 @@ try {
   } else if (command === "picker") {
     const configDirectory = requiredEnvironment("HERDR_PLUGIN_CONFIG_DIR");
     const targetPaneId = requiredEnvironment("HERDR_PROMPTS_TARGET_PANE_ID");
+    const targetSessionId = requiredEnvironment(
+      "HERDR_PROMPTS_TARGET_AGENT_SESSION_ID",
+    );
     const store = new PromptStore(configDirectory);
     const herdr = new HerdrClient(process.env.HERDR_BIN_PATH ?? "herdr", run);
     const prompts = store.load();
@@ -40,7 +43,7 @@ try {
         initialPrompts={prompts}
         store={store}
         herdr={herdr}
-        targetPaneId={targetPaneId}
+        target={{ paneId: targetPaneId, sessionId: targetSessionId }}
       />,
     );
   } else {

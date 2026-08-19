@@ -60,4 +60,20 @@ describe("PromptStore", () => {
     writeFileSync(storePath, '{"version":2,"prompts":[]}', "utf8");
     expect(() => malformedStore.load()).toThrow("Unsupported prompt store version");
   });
+
+  it.each([
+    ['{"version":1,"prompts":[{"content":"  "}]}', "Blank prompt"],
+    [
+      '{"version":1,"prompts":[{"content":"same"},{"content":"same"}]}',
+      "Duplicate prompt",
+    ],
+  ])("rejects invalid existing prompt data without overwriting it", (source, message) => {
+    const configDirectory = temporaryConfigDirectory();
+    const storePath = join(configDirectory, "prompts.json");
+    writeFileSync(storePath, source, "utf8");
+    const store = new PromptStore(configDirectory);
+
+    expect(() => store.add("New prompt")).toThrow(message);
+    expect(readFileSync(storePath, "utf8")).toBe(source);
+  });
 });

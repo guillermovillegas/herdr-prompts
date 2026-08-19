@@ -62,7 +62,7 @@ export class PromptStore {
       throw new PromptStoreError(`Invalid prompt list at ${this.path}`);
     }
 
-    return parsed.prompts.map((prompt, index) => {
+    const prompts = parsed.prompts.map((prompt, index) => {
       if (!isRecord(prompt) || typeof prompt.content !== "string") {
         throw new PromptStoreError(
           `Invalid prompt at index ${index} in ${this.path}`,
@@ -70,6 +70,21 @@ export class PromptStore {
       }
       return { content: prompt.content };
     });
+    const seen = new Set<string>();
+    for (const [index, prompt] of prompts.entries()) {
+      if (prompt.content.trim().length === 0) {
+        throw new PromptStoreError(
+          `Blank prompt at index ${index} in ${this.path}`,
+        );
+      }
+      if (seen.has(prompt.content)) {
+        throw new PromptStoreError(
+          `Duplicate prompt at index ${index} in ${this.path}`,
+        );
+      }
+      seen.add(prompt.content);
+    }
+    return prompts;
   }
 
   add(content: string): Prompt[] {

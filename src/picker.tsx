@@ -1,12 +1,13 @@
 import React, { useReducer } from "react";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
 
-import { type HerdrClient } from "./herdr.js";
+import { type AgentTarget, type HerdrClient } from "./herdr.js";
 import {
   createPickerState,
   currentPrompt,
   nextGraphemeBoundary,
   pickerReducer,
+  type PickerMode,
   visiblePrompts,
 } from "./picker-state.js";
 import type { Prompt, PromptStore } from "./store.js";
@@ -16,14 +17,14 @@ export interface PickerAppProps {
   initialPrompts: Prompt[];
   store: PromptStore;
   herdr: HerdrClient;
-  targetPaneId: string;
+  target: AgentTarget;
 }
 
 export function PickerApp({
   initialPrompts,
   store,
   herdr,
-  targetPaneId,
+  target,
 }: PickerAppProps): React.JSX.Element {
   const [state, dispatch] = useReducer(
     pickerReducer,
@@ -37,7 +38,7 @@ export function PickerApp({
 
   useInput((input, key) => {
     if (state.mode === "delete-confirm") {
-      if (key.escape || input.toLowerCase() === "n") {
+      if (key.escape || key.return || input.toLowerCase() === "n") {
         dispatch({ type: "cancel" });
       } else if (input.toLowerCase() === "y") {
         const prompt = currentPrompt(state);
@@ -61,7 +62,7 @@ export function PickerApp({
         return;
       }
       if (key.ctrl && input.toLowerCase() === "s") {
-        applyEditor(state, store, herdr, targetPaneId, dispatch, exit);
+        applyEditor(state, store, herdr, target, dispatch, exit);
         return;
       }
       if (key.upArrow || key.downArrow || key.leftArrow || key.rightArrow) {
@@ -121,7 +122,7 @@ export function PickerApp({
         return;
       }
       try {
-        herdr.insertPrompt(targetPaneId, materializePrompt(prompt.content));
+        herdr.insertPrompt(target, materializePrompt(prompt.content));
         exit();
       } catch (error) {
         dispatch({ type: "set-error", error: errorMessage(error) });
@@ -281,7 +282,7 @@ function EditorText({ text, cursor }: { text: string; cursor: number }): React.J
   );
 }
 
-function Footer({ mode }: { mode: string }): React.JSX.Element {
+function Footer({ mode }: { mode: PickerMode }): React.JSX.Element {
   const help =
     mode === "list"
       ? "Type search  ↑↓ select  Enter insert  ^N new  ^E edit  ^D delete  Esc close"
@@ -297,7 +298,7 @@ function applyEditor(
   state: ReturnType<typeof createPickerState>,
   store: PromptStore,
   herdr: HerdrClient,
-  targetPaneId: string,
+  target: AgentTarget,
   dispatch: React.Dispatch<Parameters<typeof pickerReducer>[1]>,
   exit: (error?: Error) => void,
 ): void {
@@ -319,7 +320,7 @@ function applyEditor(
         });
         return;
       }
-      herdr.insertPrompt(targetPaneId, materializePrompt(state.draft));
+      herdr.insertPrompt(target, materializePrompt(state.draft));
       exit();
     }
   } catch (error) {

@@ -36895,6 +36895,7 @@ var HerdrRuntimeError = class extends Error {
 function openPickerAction(env3, run2) {
   const targetPaneId = originatingPaneId(env3.HERDR_PLUGIN_CONTEXT_JSON);
   const herdrBin = env3.HERDR_BIN_PATH ?? "herdr";
+  const target = inspectAgent(herdrBin, targetPaneId, run2);
   const result = run2(herdrBin, [
     "plugin",
     "pane",
@@ -36911,6 +36912,8 @@ function openPickerAction(env3, run2) {
     "70%",
     "--env",
     `HERDR_PROMPTS_TARGET_PANE_ID=${targetPaneId}`,
+    "--env",
+    `HERDR_PROMPTS_TARGET_AGENT_SESSION_ID=${target.sessionId}`,
     "--focus"
   ]);
   assertCommandSucceeded(result, "open the prompt picker");
@@ -36922,16 +36925,13 @@ var HerdrClient = class {
   }
   herdrBin;
   run;
-  insertPrompt(targetPaneId, content) {
-    const infoResult = this.run(this.herdrBin, [
-      "agent",
-      "get",
-      targetPaneId
-    ]);
-    assertCommandSucceeded(infoResult, "inspect the target Agent");
-    const agent = parseAgentInfo(infoResult.stdout);
-    if (agent.paneId !== targetPaneId) {
+  insertPrompt(target, content) {
+    const agent = inspectAgent(this.herdrBin, target.paneId, this.run);
+    if (agent.paneId !== target.paneId) {
       throw new HerdrRuntimeError("Herdr returned a different target pane");
+    }
+    if (agent.sessionId !== target.sessionId) {
+      throw new HerdrRuntimeError("The target pane now hosts a different Agent");
     }
     if (agent.status !== "idle" && agent.status !== "done") {
       throw new HerdrRuntimeError(
@@ -36941,7 +36941,7 @@ var HerdrClient = class {
     const sendResult = this.run(this.herdrBin, [
       "pane",
       "send-text",
-      targetPaneId,
+      target.paneId,
       content
     ]);
     assertCommandSucceeded(sendResult, "insert the prompt");
@@ -36971,10 +36971,20 @@ function parseAgentInfo(serialized) {
   }
   const result = isRecord(response) ? response.result : void 0;
   const agent = isRecord(result) ? result.agent : void 0;
-  if (!isRecord(agent) || typeof agent.agent !== "string" || typeof agent.agent_status !== "string" || typeof agent.pane_id !== "string") {
+  const agentSession = isRecord(agent) ? agent.agent_session : void 0;
+  if (!isRecord(agent) || typeof agent.agent !== "string" || typeof agent.agent_status !== "string" || typeof agent.pane_id !== "string" || !isRecord(agentSession) || typeof agentSession.value !== "string" || agentSession.value.length === 0) {
     throw new HerdrRuntimeError("The target pane no longer hosts an Agent");
   }
-  return { paneId: agent.pane_id, status: agent.agent_status };
+  return {
+    paneId: agent.pane_id,
+    sessionId: agentSession.value,
+    status: agent.agent_status
+  };
+}
+function inspectAgent(herdrBin, paneId, run2) {
+  const result = run2(herdrBin, ["agent", "get", paneId]);
+  assertCommandSucceeded(result, "inspect the target Agent");
+  return parseAgentInfo(result.stdout);
 }
 function assertCommandSucceeded(result, operation) {
   if (result.status === 0 && !result.error) {
@@ -37205,7 +37215,7 @@ function PickerApp({
   initialPrompts,
   store,
   herdr,
-  targetPaneId
+  target
 }) {
   const [state, dispatch] = (0, import_react29.useReducer)(
     pickerReducer,
@@ -37218,7 +37228,7 @@ function PickerApp({
   const rows = stdout.rows ?? 30;
   use_input_default((input, key) => {
     if (state.mode === "delete-confirm") {
-      if (key.escape || input.toLowerCase() === "n") {
+      if (key.escape || key.return || input.toLowerCase() === "n") {
         dispatch({ type: "cancel" });
       } else if (input.toLowerCase() === "y") {
         const prompt = currentPrompt(state);
@@ -37241,7 +37251,7 @@ function PickerApp({
         return;
       }
       if (key.ctrl && input.toLowerCase() === "s") {
-        applyEditor(state, store, herdr, targetPaneId, dispatch, exit);
+        applyEditor(state, store, herdr, target, dispatch, exit);
         return;
       }
       if (key.upArrow || key.downArrow || key.leftArrow || key.rightArrow) {
@@ -37294,7 +37304,7 @@ function PickerApp({
         return;
       }
       try {
-        herdr.insertPrompt(targetPaneId, materializePrompt(prompt.content));
+        herdr.insertPrompt(target, materializePrompt(prompt.content));
         exit();
       } catch (error) {
         dispatch({ type: "set-error", error: errorMessage(error) });
@@ -37419,7 +37429,7 @@ function Footer({ mode }) {
   const help = mode === "list" ? "Type search  \u2191\u2193 select  Enter insert  ^N new  ^E edit  ^D delete  Esc close" : mode === "delete-confirm" ? "y delete  n/Esc cancel" : mode === "fill" ? "Enter newline  ^S fill prompt  Esc cancel" : "Enter newline  ^S save  Esc cancel";
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Text, { dimColor: true, children: help });
 }
-function applyEditor(state, store, herdr, targetPaneId, dispatch, exit) {
+function applyEditor(state, store, herdr, target, dispatch, exit) {
   try {
     if (state.mode === "create") {
       dispatch({ type: "replace-prompts", prompts: store.add(state.draft) });
@@ -37438,7 +37448,7 @@ function applyEditor(state, store, herdr, targetPaneId, dispatch, exit) {
         });
         return;
       }
-      herdr.insertPrompt(targetPaneId, materializePrompt(state.draft));
+      herdr.insertPrompt(target, materializePrompt(state.draft));
       exit();
     }
   } catch (error) {
@@ -37507,7 +37517,7 @@ var PromptStore = class {
     if (!Array.isArray(parsed.prompts)) {
       throw new PromptStoreError(`Invalid prompt list at ${this.path}`);
     }
-    return parsed.prompts.map((prompt, index) => {
+    const prompts = parsed.prompts.map((prompt, index) => {
       if (!isRecord2(prompt) || typeof prompt.content !== "string") {
         throw new PromptStoreError(
           `Invalid prompt at index ${index} in ${this.path}`
@@ -37515,6 +37525,21 @@ var PromptStore = class {
       }
       return { content: prompt.content };
     });
+    const seen = /* @__PURE__ */ new Set();
+    for (const [index, prompt] of prompts.entries()) {
+      if (prompt.content.trim().length === 0) {
+        throw new PromptStoreError(
+          `Blank prompt at index ${index} in ${this.path}`
+        );
+      }
+      if (seen.has(prompt.content)) {
+        throw new PromptStoreError(
+          `Duplicate prompt at index ${index} in ${this.path}`
+        );
+      }
+      seen.add(prompt.content);
+    }
+    return prompts;
   }
   add(content) {
     validateContent(content);
@@ -37619,6 +37644,9 @@ try {
   } else if (command === "picker") {
     const configDirectory = requiredEnvironment("HERDR_PLUGIN_CONFIG_DIR");
     const targetPaneId = requiredEnvironment("HERDR_PROMPTS_TARGET_PANE_ID");
+    const targetSessionId = requiredEnvironment(
+      "HERDR_PROMPTS_TARGET_AGENT_SESSION_ID"
+    );
     const store = new PromptStore(configDirectory);
     const herdr = new HerdrClient(process.env.HERDR_BIN_PATH ?? "herdr", run);
     const prompts = store.load();
@@ -37629,7 +37657,7 @@ try {
           initialPrompts: prompts,
           store,
           herdr,
-          targetPaneId
+          target: { paneId: targetPaneId, sessionId: targetSessionId }
         }
       )
     );
