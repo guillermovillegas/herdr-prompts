@@ -58,12 +58,19 @@ export class PromptStore {
         `Unsupported prompt store version at ${this.path}`,
       );
     }
+    if (!hasExactKeys(parsed, ["version", "prompts"])) {
+      throw new PromptStoreError(`Unsupported prompt store fields at ${this.path}`);
+    }
     if (!Array.isArray(parsed.prompts)) {
       throw new PromptStoreError(`Invalid prompt list at ${this.path}`);
     }
 
     const prompts = parsed.prompts.map((prompt, index) => {
-      if (!isRecord(prompt) || typeof prompt.content !== "string") {
+      if (
+        !isRecord(prompt) ||
+        !hasExactKeys(prompt, ["content"]) ||
+        typeof prompt.content !== "string"
+      ) {
         throw new PromptStoreError(
           `Invalid prompt at index ${index} in ${this.path}`,
         );
@@ -170,6 +177,17 @@ function assertUnique(prompts: readonly Prompt[], content: string): void {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function hasExactKeys(
+  value: Record<string, unknown>,
+  expectedKeys: readonly string[],
+): boolean {
+  const keys = Object.keys(value);
+  return (
+    keys.length === expectedKeys.length &&
+    expectedKeys.every((key) => Object.hasOwn(value, key))
+  );
 }
 
 function isNodeError(value: unknown): value is NodeJS.ErrnoException {

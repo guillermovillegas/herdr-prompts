@@ -67,6 +67,14 @@ describe("PromptStore", () => {
       '{"version":1,"prompts":[{"content":"same"},{"content":"same"}]}',
       "Duplicate prompt",
     ],
+    [
+      '{"version":1,"prompts":[{"content":"same","id":"future"}]}',
+      "Invalid prompt",
+    ],
+    [
+      '{"version":1,"prompts":[],"metadata":{"future":true}}',
+      "Unsupported prompt store fields",
+    ],
   ])("rejects invalid existing prompt data without overwriting it", (source, message) => {
     const configDirectory = temporaryConfigDirectory();
     const storePath = join(configDirectory, "prompts.json");
