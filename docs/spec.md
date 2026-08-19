@@ -10,9 +10,9 @@ The popup UI is English. Prompt content is unrestricted UTF-8 and may be multili
 
 - Plugin ID: `oppenheimor.herdr-prompts`.
 - Action ID: `oppenheimor.herdr-prompts.open`.
-- The action is available from an Agent pane's context menu.
-- No shortcut is installed by default. Documentation may show a user-configurable example.
-- The action opens the `picker` entrypoint as a focused `80%` by `70%` popup and passes the originating pane ID explicitly.
+- Herdr 0.8 does not expose plugin actions in the pane context menu; the product must not document that menu as an entrypoint.
+- No shortcut is installed by default. Setup documentation requires the user to choose an unbound `plugin_action` key and also provides CLI invocation as a fallback.
+- After the user focuses an Agent pane, the action opens the `picker` entrypoint as a focused `80%` by `70%` popup and passes the originating pane and Agent session identity explicitly.
 - The repository contains a root manifest and a committed self-contained bundle under `dist/`.
 
 ## Data model and persistence

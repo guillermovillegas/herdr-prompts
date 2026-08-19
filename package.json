@@ -1,6 +1,6 @@
 {
   "name": "herdr-prompts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -11,7 +11,7 @@
   "scripts": {
     "build": "tsup",
     "check": "pnpm typecheck && pnpm test && pnpm build",
-    "plugin:invoke": "herdr plugin action invoke oppenheimor.herdr-prompts.open",
+    "plugin:invoke": "herdr plugin action invoke open --plugin oppenheimor.herdr-prompts",
     "plugin:link": "pnpm build && herdr plugin link .",
     "plugin:logs": "herdr plugin log list --plugin oppenheimor.herdr-prompts",
     "plugin:unlink": "herdr plugin unlink oppenheimor.herdr-prompts",
