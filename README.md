@@ -1,49 +1,119 @@
-# Workspace List for Herdr
+# Herdr Prompts
 
-A minimal TypeScript Herdr plugin that exposes one action: list every workspace
-in the current Herdr session.
+[English](README.md) | [简体中文](README.zh-CN.md)
+
+Herdr Prompts is a keyboard-first prompt library for [Herdr](https://herdr.dev). Save reusable prompts, search them with case-insensitive substring matching, fill template variables, and insert the result into a Codex, Claude Code, OpenCode, or other Agent input—without submitting it.
+
+The plugin is local-first: prompts stay on your machine, and it makes no network requests or telemetry calls.
+
+inspired by my friend: bingguanqi
+
+## Requirements
+
+- macOS
+- Herdr 0.8.0 or newer
+- Node.js 20 or newer
+
+## Install
+
+Install from the Herdr Marketplace, or run:
+
+```bash
+herdr plugin install oppenheimor/herdr-prompts
+```
+
+Open an Agent pane's context menu and choose **Open Prompt Picker**. Herdr Prompts does not claim a global keyboard shortcut, so it cannot collide with one you already use.
+
+### Optional shortcut
+
+If you want a shortcut, choose an unbound key and add it to `~/.config/herdr/config.toml`. The key below is only an example—change it if it conflicts with your setup.
+
+```toml
+[[keys.command]]
+key = "prefix+alt+p"
+type = "plugin_action"
+command = "oppenheimor.herdr-prompts.open"
+description = "Open prompt picker"
+```
+
+Reload the configuration after editing it:
+
+```bash
+herdr server reload-config
+```
+
+## Use
+
+The picker opens over the Agent pane that invoked it. Selecting a normal prompt inserts its text into that same Agent's input without pressing Enter.
+
+### Prompt list
+
+| Key | Action |
+| --- | --- |
+| Type | Search prompt contents |
+| `↑` / `↓` | Change selection |
+| `Enter` | Insert the selected prompt |
+| `Ctrl+N` | Create a prompt |
+| `Ctrl+E` | Edit the selected prompt |
+| `Ctrl+D` | Delete the selected prompt, with confirmation |
+| `Esc` | Close the picker |
+
+### Create, edit, or fill
+
+| Key | Action |
+| --- | --- |
+| `Enter` | Insert a newline |
+| `Ctrl+S` | Save, or insert a filled template |
+| Arrow keys | Move the cursor |
+| `Esc` | Cancel |
+
+Prompt content supports full UTF-8 text, including multiline Chinese and emoji.
+
+## Templates
+
+Use `{{variable}}` anywhere in a prompt:
+
+```text
+Review {{file}} for {{concern}} and answer in {{language}}.
+```
+
+When you select a prompt with variables, Herdr Prompts opens a one-off full-text editor. Replace every unresolved variable and press `Ctrl+S`; the filled text is inserted into the original Agent input, while the saved template remains unchanged.
+
+Variable names may contain letters, numbers, underscores, and Chinese characters. Escape a literal opening delimiter with `\{{`, for example `\{{not_a_variable}}`; the inserted result contains `{{not_a_variable}}`.
+
+## Storage and privacy
+
+Prompts are stored in `prompts.json` under the plugin's private configuration directory. Print that directory with:
+
+```bash
+herdr plugin config-dir oppenheimor.herdr-prompts
+```
+
+The versioned format is intentionally small and ready for future metadata:
+
+```json
+{
+  "version": 1,
+  "prompts": [
+    { "content": "Review the current diff." }
+  ]
+}
+```
+
+Writes are atomic and the file is created with mode `0600`. Invalid or unsupported stores are reported and never overwritten. Exact duplicate prompts and blank prompts are rejected. Concurrent editing from multiple picker sessions is not supported in this release.
+
+Before inserting, the plugin verifies that the original pane still hosts an Agent in the `idle` or `done` state. It never sends Enter.
 
 ## Development
 
 ```bash
 pnpm install
 pnpm check
-```
-
-The build creates a self-contained plugin directory under `dist/`:
-
-```text
-dist/
-├── herdr-plugin.toml
-├── index.cjs
-├── index.cjs.map
-└── README.md
-```
-
-## Link and run locally
-
-Run these commands from inside a Herdr-managed pane:
-
-```bash
 pnpm plugin:link
-pnpm plugin:invoke
-pnpm plugin:logs
 ```
 
-Unlink the development build with:
+The committed `dist/index.mjs` is the self-contained Node.js bundle used by the root `herdr-plugin.toml` manifest.
 
-```bash
-pnpm plugin:unlink
-```
+## License
 
-The plugin calls the active Herdr binary through `HERDR_BIN_PATH`, falling back
-to `herdr` when the environment variable is unavailable.
-
-## Distribution
-
-Publish the contents of `dist/` as the plugin directory. If `dist/` is committed
-as a subdirectory of a GitHub repository, users can install it with:
-
-```bash
-herdr plugin install owner/repository/dist
-```
+[MIT](LICENSE)

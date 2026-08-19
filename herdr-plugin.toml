@@ -1,12 +1,21 @@
-id = "paulchess.workspace-list"
-name = "Workspace List"
+id = "oppenheimor.herdr-prompts"
+name = "Herdr Prompts"
 version = "0.1.0"
-min_herdr_version = "0.7.0"
-description = "List all workspaces in the current Herdr session."
-platforms = ["linux", "macos", "windows"]
+min_herdr_version = "0.8.0"
+description = "Save, search, fill, and reuse prompt templates across coding agents in Herdr. Inspired by my friend: bingguanqi"
+platforms = ["macos"]
 
 [[actions]]
-id = "list-workspaces"
-title = "List all workspaces"
-contexts = ["workspace"]
-command = ["node", "index.cjs"]
+id = "open"
+title = "Open Prompt Picker"
+description = "Search, manage, and insert a saved prompt into the focused Agent."
+contexts = ["pane"]
+command = ["node", "dist/index.mjs", "open"]
+
+[[panes]]
+id = "picker"
+title = "Herdr Prompts"
+placement = "popup"
+width = "80%"
+height = "70%"
+command = ["node", "dist/index.mjs", "picker"]

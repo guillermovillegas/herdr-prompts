@@ -1,16 +1,21 @@
 {
-  "name": "first-herdr-plugin",
+  "name": "herdr-prompts",
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oppenheimor/herdr-prompts.git"
+  },
   "scripts": {
-    "build": "tsup && node scripts/prepare-dist.mjs",
+    "build": "tsup",
     "check": "pnpm typecheck && pnpm test && pnpm build",
-    "plugin:invoke": "herdr plugin action invoke paulchess.workspace-list.list-workspaces",
-    "plugin:link": "pnpm build && herdr plugin link dist",
-    "plugin:logs": "herdr plugin log list --plugin paulchess.workspace-list",
-    "plugin:unlink": "herdr plugin unlink paulchess.workspace-list",
-    "start": "node dist/index.cjs",
+    "plugin:invoke": "herdr plugin action invoke oppenheimor.herdr-prompts.open",
+    "plugin:link": "pnpm build && herdr plugin link .",
+    "plugin:logs": "herdr plugin log list --plugin oppenheimor.herdr-prompts",
+    "plugin:unlink": "herdr plugin unlink oppenheimor.herdr-prompts",
+    "start": "node dist/index.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
@@ -19,8 +24,13 @@
     "node": ">=20"
   },
   "packageManager": "pnpm@11.21.0",
+  "dependencies": {
+    "ink": "^6.8.0",
+    "react": "^19.2.8"
+  },
   "devDependencies": {
     "@types/node": "^26.2.0",
+    "@types/react": "^19.2.18",
     "tsup": "^8.5.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
