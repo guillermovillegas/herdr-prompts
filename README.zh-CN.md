@@ -22,11 +22,9 @@ inspired by my friend: bingguanqi
 herdr plugin install oppenheimor/herdr-prompts
 ```
 
-在 Agent pane 上打开右键菜单，选择 **Open Prompt Picker**。插件不会默认占用全局快捷键，因此不会和你的本地配置抢地盘。
+### 唤起选择器
 
-### 可选快捷键
-
-如果希望使用快捷键，请挑选一个尚未绑定的按键，添加到 `~/.config/herdr/config.toml`。下面只是示例；如有冲突，请改成适合自己的按键。
+Herdr 0.8 不会在 pane 右键菜单中展示插件 action。为了避免插件擅自占用可能冲突的快捷键，请挑选一个尚未绑定的按键，添加到 `~/.config/herdr/config.toml`。下面只是示例；如有冲突，请改成适合自己的按键。
 
 ```toml
 [[keys.command]]
@@ -42,9 +40,17 @@ description = "Open prompt picker"
 herdr server reload-config
 ```
 
+先聚焦目标 Agent pane，再按配置的快捷键。使用 Herdr 默认 prefix 时，上面的示例表示先按 `Ctrl+B`，再按 `Alt+P`。
+
+也可以先聚焦目标 Agent pane，然后在 Herdr 管理的终端中调用已安装的 action：
+
+```bash
+herdr plugin action invoke open --plugin oppenheimor.herdr-prompts
+```
+
 ## 使用方式
 
-选择器会覆盖在发起调用的 Agent pane 上。选择普通 Prompt 后，文本会被插入原 Agent 的输入框，但不会发送 Enter。
+选择器会覆盖在当前聚焦的 Agent pane 上。选择普通 Prompt 后，文本会被插入该 Agent 的输入框，但不会发送 Enter。
 
 ### Prompt 列表
 

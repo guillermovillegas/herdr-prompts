@@ -22,11 +22,9 @@ Install from the Herdr Marketplace, or run:
 herdr plugin install oppenheimor/herdr-prompts
 ```
 
-Open an Agent pane's context menu and choose **Open Prompt Picker**. Herdr Prompts does not claim a global keyboard shortcut, so it cannot collide with one you already use.
+### Open the picker
 
-### Optional shortcut
-
-If you want a shortcut, choose an unbound key and add it to `~/.config/herdr/config.toml`. The key below is only an example—change it if it conflicts with your setup.
+Herdr 0.8 does not display plugin actions in the pane context menu. To give the picker a keyboard entrypoint without claiming a potentially conflicting shortcut, choose an unbound key and add it to `~/.config/herdr/config.toml`. The key below is only an example—change it if it conflicts with your setup.
 
 ```toml
 [[keys.command]]
@@ -42,9 +40,17 @@ Reload the configuration after editing it:
 herdr server reload-config
 ```
 
+Focus the destination Agent pane, then press your configured shortcut. With Herdr's default prefix, the example above means `Ctrl+B`, followed by `Alt+P`.
+
+You can also invoke the installed action from a Herdr-managed terminal after focusing the destination Agent pane:
+
+```bash
+herdr plugin action invoke open --plugin oppenheimor.herdr-prompts
+```
+
 ## Use
 
-The picker opens over the Agent pane that invoked it. Selecting a normal prompt inserts its text into that same Agent's input without pressing Enter.
+The picker opens over the focused Agent pane. Selecting a normal prompt inserts its text into that same Agent's input without pressing Enter.
 
 ### Prompt list
 
