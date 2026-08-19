@@ -6,7 +6,9 @@
 
 Herdr Prompts 是一款为 [Herdr](https://herdr.dev) 打造的键盘优先 Prompt 库。它让常用指令始终离 Codex、Claude Code、OpenCode 和其他 Agent 只有一个快捷键的距离，并把选中的文本插入输入框——不会自动提交。
 
-![Herdr Prompts 的 Prompt 库与预览](assets/prompt-library.png)
+<p align="center">
+  <img src="assets/prompt-library.png" alt="Herdr Prompts 的 Prompt 库与预览" width="1200">
+</p>
 
 ## 为什么使用 Herdr Prompts
 
@@ -22,13 +24,25 @@ Herdr Prompts 是一款为 [Herdr](https://herdr.dev) 打造的键盘优先 Prom
 
 支持普通文本、多行指令、中文、emoji 和模板。按 `Ctrl+S` 保存。
 
-![新建可复用 Prompt](assets/create-prompt.png)
+<p align="center">
+  <img src="assets/create-prompt.png" alt="新建可复用 Prompt" width="1200">
+</p>
 
 ### 插入前填写模板变量
 
 选择模板后会进入一次性编辑器，并列出所有尚未替换的变量。填写完成后按 `Ctrl+S`，最终 Prompt 会被插入原 Agent 输入框。
 
-![填写 Prompt 模板变量](assets/template-fill.png)
+<p align="center">
+  <img src="assets/template-fill.png" alt="填写 Prompt 模板变量" width="1200">
+</p>
+
+### 插入 Agent 输入框，但不自动发送
+
+最终 Prompt 会进入当前聚焦的 Agent 输入框，光标停在末尾，等待你检查和发送。Herdr Prompts 不会替你按 Enter。
+
+<p align="center">
+  <img src="assets/insert-into-agent.png" alt="Prompt 已插入 Codex 输入框但尚未发送" width="1200">
+</p>
 
 inspired by my friend: bingguanqi
 

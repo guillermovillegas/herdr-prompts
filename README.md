@@ -6,7 +6,9 @@
 
 Herdr Prompts is a keyboard-first prompt library for [Herdr](https://herdr.dev). It keeps reusable instructions one shortcut away from Codex, Claude Code, OpenCode, and other Agents—then inserts the selected text without submitting it.
 
-![Herdr Prompts library and preview](assets/prompt-library.png)
+<p align="center">
+  <img src="assets/prompt-library.png" alt="Herdr Prompts library and preview" width="1200">
+</p>
 
 ## Why Herdr Prompts
 
@@ -22,13 +24,25 @@ Herdr Prompts is a keyboard-first prompt library for [Herdr](https://herdr.dev).
 
 Write ordinary text, multiline instructions, Chinese, emoji, or templates. Press `Ctrl+S` to save.
 
-![Creating a reusable prompt](assets/create-prompt.png)
+<p align="center">
+  <img src="assets/create-prompt.png" alt="Creating a reusable prompt" width="1200">
+</p>
 
 ### Fill variables before insertion
 
 Selecting a template opens a one-off editor and shows every unresolved variable. Replace them, press `Ctrl+S`, and the completed prompt is inserted into the original Agent input.
 
-![Filling prompt template variables](assets/template-fill.png)
+<p align="center">
+  <img src="assets/template-fill.png" alt="Filling prompt template variables" width="1200">
+</p>
+
+### Insert into the Agent—without sending
+
+The completed prompt lands in the focused Agent input with the cursor ready for review. Herdr Prompts never presses Enter for you.
+
+<p align="center">
+  <img src="assets/insert-into-agent.png" alt="Prompt inserted into a Codex input without being submitted" width="1200">
+</p>
 
 inspired by my friend: bingguanqi
 
