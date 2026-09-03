@@ -28703,7 +28703,7 @@ var require_jsx_runtime = __commonJS({
 
 // src/index.tsx
 var import_react30 = __toESM(require_react(), 1);
-import { spawnSync } from "child_process";
+import { spawnSync as spawnSync2 } from "child_process";
 
 // node_modules/.pnpm/ink@6.8.0_@types+react@19.2.18_react@19.2.8/node_modules/ink/build/render.js
 import { Stream } from "stream";
@@ -36895,7 +36895,14 @@ var HerdrRuntimeError = class extends Error {
 function openPickerAction(env3, run2) {
   const targetPaneId = originatingPaneId(env3.HERDR_PLUGIN_CONTEXT_JSON);
   const herdrBin = env3.HERDR_BIN_PATH ?? "herdr";
-  const target = inspectAgent(herdrBin, targetPaneId, run2);
+  let sessionId = "";
+  if (targetPaneId) {
+    try {
+      const target = inspectAgent(herdrBin, targetPaneId, run2);
+      sessionId = target.sessionId;
+    } catch {
+    }
+  }
   const result = run2(herdrBin, [
     "plugin",
     "pane",
@@ -36913,7 +36920,7 @@ function openPickerAction(env3, run2) {
     "--env",
     `HERDR_PROMPTS_TARGET_PANE_ID=${targetPaneId}`,
     "--env",
-    `HERDR_PROMPTS_TARGET_AGENT_SESSION_ID=${target.sessionId}`,
+    `HERDR_PROMPTS_TARGET_AGENT_SESSION_ID=${sessionId}`,
     "--focus"
   ]);
   assertCommandSucceeded(result, "open the prompt picker");
@@ -36926,17 +36933,25 @@ var HerdrClient = class {
   herdrBin;
   run;
   insertPrompt(target, content) {
-    const agent = inspectAgent(this.herdrBin, target.paneId, this.run);
-    if (agent.paneId !== target.paneId) {
-      throw new HerdrRuntimeError("Herdr returned a different target pane");
+    if (!target.paneId) {
+      throw new HerdrRuntimeError("No target pane to insert prompt into");
     }
-    if (agent.sessionId !== target.sessionId) {
-      throw new HerdrRuntimeError("The target pane now hosts a different Agent");
-    }
-    if (agent.status !== "idle" && agent.status !== "done") {
-      throw new HerdrRuntimeError(
-        `Target Agent is ${agent.status}, not idle`
-      );
+    if (target.sessionId) {
+      try {
+        const agent = inspectAgent(this.herdrBin, target.paneId, this.run);
+        if (agent.sessionId && agent.sessionId !== target.sessionId) {
+          throw new HerdrRuntimeError("The target pane now hosts a different Agent");
+        }
+        if (agent.status !== "idle" && agent.status !== "done") {
+          throw new HerdrRuntimeError(
+            `Target Agent is ${agent.status}, not idle`
+          );
+        }
+      } catch (err) {
+        if (err instanceof HerdrRuntimeError && (err.message.includes("different Agent") || err.message.includes("not idle"))) {
+          throw err;
+        }
+      }
     }
     const sendResult = this.run(this.herdrBin, [
       "pane",
@@ -36949,16 +36964,16 @@ var HerdrClient = class {
 };
 function originatingPaneId(serializedContext) {
   if (!serializedContext) {
-    throw new HerdrRuntimeError("HERDR_PLUGIN_CONTEXT_JSON is missing");
+    return "";
   }
   let context;
   try {
     context = JSON.parse(serializedContext);
   } catch {
-    throw new HerdrRuntimeError("HERDR_PLUGIN_CONTEXT_JSON is invalid");
+    return "";
   }
-  if (!isRecord(context) || typeof context.focused_pane_id !== "string" || context.focused_pane_id.length === 0) {
-    throw new HerdrRuntimeError("The plugin action requires a focused pane");
+  if (!isRecord(context) || typeof context.focused_pane_id !== "string") {
+    return "";
   }
   return context.focused_pane_id;
 }
@@ -36999,6 +37014,7 @@ function isRecord(value) {
 
 // src/picker.tsx
 var import_react29 = __toESM(require_react(), 1);
+import { spawnSync } from "child_process";
 
 // src/search.ts
 function searchPrompts(prompts, query) {
@@ -37007,7 +37023,7 @@ function searchPrompts(prompts, query) {
   }
   const normalizedQuery = query.toLowerCase();
   return prompts.filter(
-    (prompt) => prompt.content.toLowerCase().includes(normalizedQuery)
+    (prompt) => prompt.title && prompt.title.toLowerCase().includes(normalizedQuery) || prompt.content.toLowerCase().includes(normalizedQuery)
   );
 }
 
@@ -37087,7 +37103,9 @@ function pickerReducer(state, action) {
     case "replace-prompts":
       return listState(state, action.prompts);
     case "set-error":
-      return { ...state, error: action.error };
+      return { ...state, error: action.error, statusMessage: void 0 };
+    case "set-status":
+      return { ...state, statusMessage: action.message, error: void 0 };
     case "clear-error":
       return clearError(state);
   }
@@ -37114,8 +37132,8 @@ function listState(state, prompts) {
   };
 }
 function clearError(state) {
-  if (state.error === void 0) return state;
-  const { error: _, ...withoutError } = state;
+  if (state.error === void 0 && state.statusMessage === void 0) return state;
+  const { error: _, statusMessage: __, ...withoutError } = state;
   return withoutError;
 }
 function isEditorMode(mode) {
@@ -37216,6 +37234,17 @@ function materializePrompt(content) {
 
 // src/picker.tsx
 var import_jsx_runtime = __toESM(require_jsx_runtime(), 1);
+function copyToClipboard(text) {
+  try {
+    const result = spawnSync("pbcopy", {
+      input: text,
+      encoding: "utf8"
+    });
+    return result.status === 0;
+  } catch {
+    return false;
+  }
+}
 function PickerApp({
   initialPrompts,
   store,
@@ -37255,6 +37284,24 @@ function PickerApp({
         }
         return;
       }
+      if (state.mode === "fill" && (key.ctrl && (input.toLowerCase() === "c" || input.toLowerCase() === "y") || key.tab)) {
+        const unresolved = findTemplateVariables(state.draft);
+        if (unresolved.length > 0) {
+          dispatch({
+            type: "set-error",
+            error: `Replace unresolved variables before copying: ${unresolved.join(", ")}`
+          });
+          return;
+        }
+        const textToCopy = materializePrompt(state.draft);
+        const copied = copyToClipboard(textToCopy);
+        if (copied) {
+          dispatch({ type: "set-status", message: "\u2713 Filled prompt copied to clipboard!" });
+        } else {
+          dispatch({ type: "set-error", error: "Failed to copy prompt to clipboard" });
+        }
+        return;
+      }
       if (key.ctrl && input.toLowerCase() === "s") {
         applyEditor(state, store, herdr, target, dispatch, exit);
         return;
@@ -37291,6 +37338,16 @@ function PickerApp({
       dispatch({ type: "move", delta: 1 });
     } else if (isBackwardDeletionKey(key)) {
       dispatch({ type: "set-query", query: state.query.slice(0, -1) });
+    } else if (key.ctrl && (input.toLowerCase() === "c" || input.toLowerCase() === "y") || key.tab) {
+      const prompt = currentPrompt(state);
+      if (!prompt) return;
+      const textToCopy = materializePrompt(prompt.content);
+      const copied = copyToClipboard(textToCopy);
+      if (copied) {
+        dispatch({ type: "set-status", message: "\u2713 Prompt copied to clipboard!" });
+      } else {
+        dispatch({ type: "set-error", error: "Failed to copy prompt to clipboard" });
+      }
     } else if (key.ctrl && input.toLowerCase() === "n") {
       dispatch({ type: "start-create" });
     } else if (key.ctrl && input.toLowerCase() === "e") {
@@ -37305,8 +37362,14 @@ function PickerApp({
         return;
       }
       try {
-        herdr.insertPrompt(target, materializePrompt(prompt.content));
-        exit();
+        const textToInsert = materializePrompt(prompt.content);
+        copyToClipboard(textToInsert);
+        if (target.paneId) {
+          herdr.insertPrompt(target, textToInsert);
+          exit();
+        } else {
+          dispatch({ type: "set-status", message: "\u2713 Prompt copied to clipboard! (No target pane to insert into)" });
+        }
       } catch (error) {
         dispatch({ type: "set-error", error: errorMessage(error) });
       }
@@ -37323,6 +37386,7 @@ function PickerApp({
       ] })
     ] }),
     state.mode === "list" || state.mode === "delete-confirm" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ListView, { state, columns, rows }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(EditorView, { state }),
+    state.statusMessage ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Text, { color: "green", children: state.statusMessage }) : null,
     state.error ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Text, { color: "red", children: state.error }) : null,
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Footer, { mode: state.mode })
   ] });
@@ -37377,7 +37441,7 @@ function ListView({
                 ...active ? { color: "cyan", bold: true } : {},
                 children: [
                   active ? "\u203A " : "  ",
-                  truncate(summary(prompt.content), narrow ? columns - 8 : Math.floor(columns * 0.36))
+                  truncate(prompt.title ? prompt.title : summary(prompt.content), narrow ? columns - 8 : Math.floor(columns * 0.36))
                 ]
               },
               `${absoluteIndex}:${prompt.content}`
@@ -37385,15 +37449,19 @@ function ListView({
           })
         }
       ),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
         Box_default,
         {
           width: narrow ? "100%" : "60%",
           minHeight: narrow ? 5 : Math.min(maxRows + 2, 10),
+          flexDirection: "column",
           borderStyle: "round",
           borderColor: "gray",
           paddingX: 1,
-          children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Text, { wrap: "wrap", children: selected?.content ?? "No prompt selected" })
+          children: [
+            selected?.title ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Text, { bold: true, color: "cyan", children: selected.title }) }) : null,
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Text, { wrap: "wrap", children: selected?.content ?? "No prompt selected" })
+          ]
         }
       )
     ] }),
@@ -37427,7 +37495,7 @@ function EditorText({ text, cursor }) {
   ] });
 }
 function Footer({ mode }) {
-  const help = mode === "list" ? "Type search  \u2191\u2193 select  Enter insert  ^N new  ^E edit  ^D delete  Esc close" : mode === "delete-confirm" ? "y delete  n/Esc cancel" : mode === "fill" ? "Enter newline  ^S fill prompt  Esc cancel" : "Enter newline  ^S save  Esc cancel";
+  const help = mode === "list" ? "Type search  \u2191\u2193 select  Enter insert  Tab/^C copy  ^N new  ^E edit  ^D delete  Esc close" : mode === "delete-confirm" ? "y delete  n/Esc cancel" : mode === "fill" ? "Enter newline  ^S fill & insert  Tab/^C copy  Esc cancel" : "Enter newline  ^S save  Esc cancel";
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Text, { dimColor: true, children: help });
 }
 function applyEditor(state, store, herdr, target, dispatch, exit) {
@@ -37449,8 +37517,15 @@ function applyEditor(state, store, herdr, target, dispatch, exit) {
         });
         return;
       }
-      herdr.insertPrompt(target, materializePrompt(state.draft));
-      exit();
+      const text = materializePrompt(state.draft);
+      copyToClipboard(text);
+      if (target.paneId) {
+        herdr.insertPrompt(target, text);
+        exit();
+      } else {
+        dispatch({ type: "set-status", message: "\u2713 Filled prompt copied to clipboard!" });
+        dispatch({ type: "cancel" });
+      }
     }
   } catch (error) {
     dispatch({ type: "set-error", error: errorMessage(error) });
@@ -37490,6 +37565,7 @@ var PromptStore = class {
   }
   configDirectory;
   path;
+  isArrayFormat = false;
   load() {
     let source;
     try {
@@ -37510,24 +37586,42 @@ var PromptStore = class {
         `Invalid prompt store at ${this.path}: ${errorMessage2(error)}`
       );
     }
-    if (!isRecord2(parsed) || parsed.version !== 1) {
+    let rawList;
+    if (Array.isArray(parsed)) {
+      this.isArrayFormat = true;
+      rawList = parsed;
+    } else if (isRecord2(parsed)) {
+      if (parsed.version !== 1) {
+        throw new PromptStoreError(
+          `Unsupported prompt store version at ${this.path}`
+        );
+      }
+      if (!hasExactKeys(parsed, ["version", "prompts"])) {
+        throw new PromptStoreError(`Unsupported prompt store fields at ${this.path}`);
+      }
+      if (!Array.isArray(parsed.prompts)) {
+        throw new PromptStoreError(`Invalid prompt list at ${this.path}`);
+      }
+      this.isArrayFormat = false;
+      rawList = parsed.prompts;
+    } else {
       throw new PromptStoreError(
         `Unsupported prompt store version at ${this.path}`
       );
     }
-    if (!hasExactKeys(parsed, ["version", "prompts"])) {
-      throw new PromptStoreError(`Unsupported prompt store fields at ${this.path}`);
-    }
-    if (!Array.isArray(parsed.prompts)) {
-      throw new PromptStoreError(`Invalid prompt list at ${this.path}`);
-    }
-    const prompts = parsed.prompts.map((prompt, index) => {
-      if (!isRecord2(prompt) || !hasExactKeys(prompt, ["content"]) || typeof prompt.content !== "string") {
+    const prompts = rawList.map((prompt, index) => {
+      if (typeof prompt === "string") {
+        return { content: prompt };
+      }
+      if (!isRecord2(prompt) || !hasAllowedKeys(prompt, ["content", "title"]) || typeof prompt.content !== "string" || prompt.title !== void 0 && typeof prompt.title !== "string") {
         throw new PromptStoreError(
           `Invalid prompt at index ${index} in ${this.path}`
         );
       }
-      return { content: prompt.content };
+      return {
+        ...prompt.title !== void 0 ? { title: prompt.title } : {},
+        content: prompt.content
+      };
     });
     const seen = /* @__PURE__ */ new Set();
     for (const [index, prompt] of prompts.entries()) {
@@ -37545,15 +37639,15 @@ var PromptStore = class {
     }
     return prompts;
   }
-  add(content) {
+  add(content, title) {
     validateContent(content);
     const prompts = this.load();
     assertUnique(prompts, content);
-    const next = [{ content }, ...prompts];
+    const next = [{ ...title ? { title } : {}, content }, ...prompts];
     this.save(next);
     return next;
   }
-  update(originalContent, content) {
+  update(originalContent, content, title) {
     validateContent(content);
     const prompts = this.load();
     const index = prompts.findIndex(
@@ -37565,8 +37659,10 @@ var PromptStore = class {
     if (content !== originalContent) {
       assertUnique(prompts, content);
     }
+    const prevTitle = prompts[index]?.title;
+    const finalTitle = title !== void 0 ? title : prevTitle;
     const next = prompts.map(
-      (prompt, promptIndex) => promptIndex === index ? { content } : prompt
+      (prompt, promptIndex) => promptIndex === index ? { ...finalTitle ? { title: finalTitle } : {}, content } : prompt
     );
     this.save(next);
     return next;
@@ -37587,9 +37683,9 @@ var PromptStore = class {
       this.configDirectory,
       `.prompts-${process.pid}-${randomUUID()}.tmp`
     );
-    const promptFile = { version: 1, prompts };
+    const dataToWrite = this.isArrayFormat ? prompts : { version: 1, prompts };
     try {
-      writeFileSync(temporaryPath, `${JSON.stringify(promptFile, null, 2)}
+      writeFileSync(temporaryPath, `${JSON.stringify(dataToWrite, null, 2)}
 `, {
         encoding: "utf8",
         flag: "wx",
@@ -37624,6 +37720,9 @@ function hasExactKeys(value, expectedKeys) {
   const keys = Object.keys(value);
   return keys.length === expectedKeys.length && expectedKeys.every((key) => Object.hasOwn(value, key));
 }
+function hasAllowedKeys(value, allowedKeys) {
+  return Object.keys(value).every((key) => allowedKeys.includes(key));
+}
 function isNodeError(value) {
   return value instanceof Error;
 }
@@ -37634,7 +37733,7 @@ function errorMessage2(value) {
 // src/index.tsx
 var import_jsx_runtime2 = __toESM(require_jsx_runtime(), 1);
 var run = (command2, args) => {
-  const result = spawnSync(command2, args, {
+  const result = spawnSync2(command2, args, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"]
   });

@@ -17,6 +17,7 @@ export interface PickerState {
   cursor: number;
   originalContent?: string;
   error?: string;
+  statusMessage?: string;
 }
 
 export type PickerAction =
@@ -33,6 +34,7 @@ export type PickerAction =
   | { type: "move-cursor"; direction: "left" | "right" | "up" | "down" }
   | { type: "replace-prompts"; prompts: Prompt[] }
   | { type: "set-error"; error: string }
+  | { type: "set-status"; message: string }
   | { type: "clear-error" };
 
 export function createPickerState(prompts: Prompt[]): PickerState {
@@ -127,7 +129,9 @@ export function pickerReducer(
     case "replace-prompts":
       return listState(state, action.prompts);
     case "set-error":
-      return { ...state, error: action.error };
+      return { ...state, error: action.error, statusMessage: undefined };
+    case "set-status":
+      return { ...state, statusMessage: action.message, error: undefined };
     case "clear-error":
       return clearError(state);
   }
@@ -162,8 +166,8 @@ function listState(state: PickerState, prompts: Prompt[]): PickerState {
 }
 
 function clearError(state: PickerState): PickerState {
-  if (state.error === undefined) return state;
-  const { error: _, ...withoutError } = state;
+  if (state.error === undefined && state.statusMessage === undefined) return state;
+  const { error: _, statusMessage: __, ...withoutError } = state;
   return withoutError;
 }
 

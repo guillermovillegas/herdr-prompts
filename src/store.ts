@@ -9,6 +9,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 
 export interface Prompt {
+  title?: string;
   content: string;
 }
 
@@ -26,6 +27,7 @@ export class PromptStoreError extends Error {
 
 export class PromptStore {
   readonly path: string;
+  private isArrayFormat = false;
 
   constructor(private readonly configDirectory: string) {
     this.path = join(configDirectory, "prompts.json");
@@ -53,30 +55,50 @@ export class PromptStore {
       );
     }
 
-    if (!isRecord(parsed) || parsed.version !== 1) {
+    let rawList: unknown[];
+    if (Array.isArray(parsed)) {
+      this.isArrayFormat = true;
+      rawList = parsed;
+    } else if (isRecord(parsed)) {
+      if (parsed.version !== 1) {
+        throw new PromptStoreError(
+          `Unsupported prompt store version at ${this.path}`,
+        );
+      }
+      if (!hasExactKeys(parsed, ["version", "prompts"])) {
+        throw new PromptStoreError(`Unsupported prompt store fields at ${this.path}`);
+      }
+      if (!Array.isArray(parsed.prompts)) {
+        throw new PromptStoreError(`Invalid prompt list at ${this.path}`);
+      }
+      this.isArrayFormat = false;
+      rawList = parsed.prompts;
+    } else {
       throw new PromptStoreError(
         `Unsupported prompt store version at ${this.path}`,
       );
     }
-    if (!hasExactKeys(parsed, ["version", "prompts"])) {
-      throw new PromptStoreError(`Unsupported prompt store fields at ${this.path}`);
-    }
-    if (!Array.isArray(parsed.prompts)) {
-      throw new PromptStoreError(`Invalid prompt list at ${this.path}`);
-    }
 
-    const prompts = parsed.prompts.map((prompt, index) => {
+    const prompts: Prompt[] = rawList.map((prompt, index) => {
+      if (typeof prompt === "string") {
+        return { content: prompt };
+      }
       if (
         !isRecord(prompt) ||
-        !hasExactKeys(prompt, ["content"]) ||
-        typeof prompt.content !== "string"
+        !hasAllowedKeys(prompt, ["content", "title"]) ||
+        typeof prompt.content !== "string" ||
+        (prompt.title !== undefined && typeof prompt.title !== "string")
       ) {
         throw new PromptStoreError(
           `Invalid prompt at index ${index} in ${this.path}`,
         );
       }
-      return { content: prompt.content };
+      return {
+        ...(prompt.title !== undefined ? { title: prompt.title } : {}),
+        content: prompt.content,
+      };
     });
+
     const seen = new Set<string>();
     for (const [index, prompt] of prompts.entries()) {
       if (prompt.content.trim().length === 0) {
@@ -94,16 +116,16 @@ export class PromptStore {
     return prompts;
   }
 
-  add(content: string): Prompt[] {
+  add(content: string, title?: string): Prompt[] {
     validateContent(content);
     const prompts = this.load();
     assertUnique(prompts, content);
-    const next = [{ content }, ...prompts];
+    const next = [{ ...(title ? { title } : {}), content }, ...prompts];
     this.save(next);
     return next;
   }
 
-  update(originalContent: string, content: string): Prompt[] {
+  update(originalContent: string, content: string, title?: string): Prompt[] {
     validateContent(content);
     const prompts = this.load();
     const index = prompts.findIndex(
@@ -116,8 +138,13 @@ export class PromptStore {
       assertUnique(prompts, content);
     }
 
+    const prevTitle = prompts[index]?.title;
+    const finalTitle = title !== undefined ? title : prevTitle;
+
     const next = prompts.map((prompt, promptIndex) =>
-      promptIndex === index ? { content } : prompt,
+      promptIndex === index
+        ? { ...(finalTitle ? { title: finalTitle } : {}), content }
+        : prompt,
     );
     this.save(next);
     return next;
@@ -141,10 +168,12 @@ export class PromptStore {
       this.configDirectory,
       `.prompts-${process.pid}-${randomUUID()}.tmp`,
     );
-    const promptFile: PromptFile = { version: 1, prompts };
+    const dataToWrite = this.isArrayFormat
+      ? prompts
+      : ({ version: 1, prompts } as PromptFile);
 
     try {
-      writeFileSync(temporaryPath, `${JSON.stringify(promptFile, null, 2)}\n`, {
+      writeFileSync(temporaryPath, `${JSON.stringify(dataToWrite, null, 2)}\n`, {
         encoding: "utf8",
         flag: "wx",
         mode: 0o600,
@@ -188,6 +217,13 @@ function hasExactKeys(
     keys.length === expectedKeys.length &&
     expectedKeys.every((key) => Object.hasOwn(value, key))
   );
+}
+
+function hasAllowedKeys(
+  value: Record<string, unknown>,
+  allowedKeys: readonly string[],
+): boolean {
+  return Object.keys(value).every((key) => allowedKeys.includes(key));
 }
 
 function isNodeError(value: unknown): value is NodeJS.ErrnoException {

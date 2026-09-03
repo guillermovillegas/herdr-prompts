@@ -84,4 +84,23 @@ describe("PromptStore", () => {
     expect(() => store.add("New prompt")).toThrow(message);
     expect(readFileSync(storePath, "utf8")).toBe(source);
   });
+
+  it("loads and saves JSON array format with prompt titles", () => {
+    const configDirectory = temporaryConfigDirectory();
+    const storePath = join(configDirectory, "prompts.json");
+    const initial = [
+      { title: "Architect", content: "You are the Project Architect" },
+      { title: "Review", content: "Review git diff" },
+    ];
+    writeFileSync(storePath, JSON.stringify(initial, null, 2), "utf8");
+    const store = new PromptStore(configDirectory);
+
+    const loaded = store.load();
+    expect(loaded).toEqual(initial);
+
+    store.add("New prompt", "New Title");
+    const afterAdd = JSON.parse(readFileSync(storePath, "utf8"));
+    expect(Array.isArray(afterAdd)).toBe(true);
+    expect(afterAdd[0]).toEqual({ title: "New Title", content: "New prompt" });
+  });
 });

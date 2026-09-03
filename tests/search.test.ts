@@ -15,4 +15,13 @@ describe("searchPrompts", () => {
     expect(searchPrompts(prompts, "代码重构")).toEqual([prompts[2]]);
     expect(searchPrompts(prompts, "")).toEqual(prompts);
   });
+
+  it("matches prompt by title substring", () => {
+    const prompts = [
+      { title: "Project Architect", content: "You are the Project Architect" },
+      { title: "Code Review", content: "Check diff" },
+    ];
+    expect(searchPrompts(prompts, "architect")).toEqual([prompts[0]]);
+    expect(searchPrompts(prompts, "review")).toEqual([prompts[1]]);
+  });
 });

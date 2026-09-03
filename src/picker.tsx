@@ -1,4 +1,5 @@
 import React, { useReducer } from "react";
+import { spawnSync } from "node:child_process";
 import { Box, Text, useApp, useInput, useStdout } from "ink";
 
 import { type AgentTarget, type HerdrClient } from "./herdr.js";
@@ -13,6 +14,18 @@ import {
 import { isBackwardDeletionKey } from "./input.js";
 import type { Prompt, PromptStore } from "./store.js";
 import { findTemplateVariables, materializePrompt } from "./template.js";
+
+export function copyToClipboard(text: string): boolean {
+  try {
+    const result = spawnSync("pbcopy", {
+      input: text,
+      encoding: "utf8",
+    });
+    return result.status === 0;
+  } catch {
+    return false;
+  }
+}
 
 export interface PickerAppProps {
   initialPrompts: Prompt[];
@@ -62,6 +75,24 @@ export function PickerApp({
         }
         return;
       }
+      if (state.mode === "fill" && ((key.ctrl && (input.toLowerCase() === "c" || input.toLowerCase() === "y")) || key.tab)) {
+        const unresolved = findTemplateVariables(state.draft);
+        if (unresolved.length > 0) {
+          dispatch({
+            type: "set-error",
+            error: `Replace unresolved variables before copying: ${unresolved.join(", ")}`,
+          });
+          return;
+        }
+        const textToCopy = materializePrompt(state.draft);
+        const copied = copyToClipboard(textToCopy);
+        if (copied) {
+          dispatch({ type: "set-status", message: "✓ Filled prompt copied to clipboard!" });
+        } else {
+          dispatch({ type: "set-error", error: "Failed to copy prompt to clipboard" });
+        }
+        return;
+      }
       if (key.ctrl && input.toLowerCase() === "s") {
         applyEditor(state, store, herdr, target, dispatch, exit);
         return;
@@ -105,6 +136,16 @@ export function PickerApp({
       dispatch({ type: "move", delta: 1 });
     } else if (isBackwardDeletionKey(key)) {
       dispatch({ type: "set-query", query: state.query.slice(0, -1) });
+    } else if ((key.ctrl && (input.toLowerCase() === "c" || input.toLowerCase() === "y")) || key.tab) {
+      const prompt = currentPrompt(state);
+      if (!prompt) return;
+      const textToCopy = materializePrompt(prompt.content);
+      const copied = copyToClipboard(textToCopy);
+      if (copied) {
+        dispatch({ type: "set-status", message: "✓ Prompt copied to clipboard!" });
+      } else {
+        dispatch({ type: "set-error", error: "Failed to copy prompt to clipboard" });
+      }
     } else if (key.ctrl && input.toLowerCase() === "n") {
       dispatch({ type: "start-create" });
     } else if (key.ctrl && input.toLowerCase() === "e") {
@@ -119,8 +160,14 @@ export function PickerApp({
         return;
       }
       try {
-        herdr.insertPrompt(target, materializePrompt(prompt.content));
-        exit();
+        const textToInsert = materializePrompt(prompt.content);
+        copyToClipboard(textToInsert);
+        if (target.paneId) {
+          herdr.insertPrompt(target, textToInsert);
+          exit();
+        } else {
+          dispatch({ type: "set-status", message: "✓ Prompt copied to clipboard! (No target pane to insert into)" });
+        }
       } catch (error) {
         dispatch({ type: "set-error", error: errorMessage(error) });
       }
@@ -142,6 +189,7 @@ export function PickerApp({
       ) : (
         <EditorView state={state} />
       )}
+      {state.statusMessage ? <Text color="green">{state.statusMessage}</Text> : null}
       {state.error ? <Text color="red">{state.error}</Text> : null}
       <Footer mode={state.mode} />
     </Box>
@@ -211,7 +259,7 @@ function ListView({
                   {...(active ? { color: "cyan" as const, bold: true } : {})}
                 >
                   {active ? "› " : "  "}
-                  {truncate(summary(prompt.content), narrow ? columns - 8 : Math.floor(columns * 0.36))}
+                  {truncate(prompt.title ? prompt.title : summary(prompt.content), narrow ? columns - 8 : Math.floor(columns * 0.36))}
                 </Text>
               );
             })
@@ -220,10 +268,16 @@ function ListView({
         <Box
           width={narrow ? "100%" : "60%"}
           minHeight={narrow ? 5 : Math.min(maxRows + 2, 10)}
+          flexDirection="column"
           borderStyle="round"
           borderColor="gray"
           paddingX={1}
         >
+          {selected?.title ? (
+            <Box marginBottom={1}>
+              <Text bold color="cyan">{selected.title}</Text>
+            </Box>
+          ) : null}
           <Text wrap="wrap">{selected?.content ?? "No prompt selected"}</Text>
         </Box>
       </Box>
@@ -282,11 +336,11 @@ function EditorText({ text, cursor }: { text: string; cursor: number }): React.J
 function Footer({ mode }: { mode: PickerMode }): React.JSX.Element {
   const help =
     mode === "list"
-      ? "Type search  ↑↓ select  Enter insert  ^N new  ^E edit  ^D delete  Esc close"
+      ? "Type search  ↑↓ select  Enter insert  Tab/^C copy  ^N new  ^E edit  ^D delete  Esc close"
       : mode === "delete-confirm"
         ? "y delete  n/Esc cancel"
         : mode === "fill"
-          ? "Enter newline  ^S fill prompt  Esc cancel"
+          ? "Enter newline  ^S fill & insert  Tab/^C copy  Esc cancel"
           : "Enter newline  ^S save  Esc cancel";
   return <Text dimColor>{help}</Text>;
 }
@@ -317,8 +371,15 @@ function applyEditor(
         });
         return;
       }
-      herdr.insertPrompt(target, materializePrompt(state.draft));
-      exit();
+      const text = materializePrompt(state.draft);
+      copyToClipboard(text);
+      if (target.paneId) {
+        herdr.insertPrompt(target, text);
+        exit();
+      } else {
+        dispatch({ type: "set-status", message: "✓ Filled prompt copied to clipboard!" });
+        dispatch({ type: "cancel" });
+      }
     }
   } catch (error) {
     dispatch({ type: "set-error", error: errorMessage(error) });

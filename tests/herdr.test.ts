@@ -50,6 +50,44 @@ describe("openPickerAction", () => {
       "--focus",
     ]);
   });
+
+  it("opens popup even when the focused pane is not an agent", () => {
+    const run = vi
+      .fn<RunCommand>()
+      .mockReturnValueOnce({ stdout: "", stderr: "agent target not found", status: 1 })
+      .mockReturnValueOnce({ stdout: "", stderr: "", status: 0 });
+
+    openPickerAction(
+      {
+        HERDR_BIN_PATH: "/opt/herdr/bin/herdr",
+        HERDR_PLUGIN_CONTEXT_JSON: JSON.stringify({
+          focused_pane_id: "w1:p9",
+        }),
+      },
+      run,
+    );
+
+    expect(run).toHaveBeenNthCalledWith(2, "/opt/herdr/bin/herdr", [
+      "plugin",
+      "pane",
+      "open",
+      "--plugin",
+      "oppenheimor.herdr-prompts",
+      "--entrypoint",
+      "picker",
+      "--placement",
+      "popup",
+      "--width",
+      "80%",
+      "--height",
+      "70%",
+      "--env",
+      "HERDR_PROMPTS_TARGET_PANE_ID=w1:p9",
+      "--env",
+      "HERDR_PROMPTS_TARGET_AGENT_SESSION_ID=",
+      "--focus",
+    ]);
+  });
 });
 
 describe("HerdrClient", () => {

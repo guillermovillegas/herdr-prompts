@@ -11,7 +11,7 @@ export type RunCommand = (command: string, args: string[]) => CommandResult;
 
 export interface AgentTarget {
   paneId: string;
-  sessionId: string;
+  sessionId?: string;
 }
 
 export class HerdrRuntimeError extends Error {
@@ -27,7 +27,15 @@ export function openPickerAction(
 ): void {
   const targetPaneId = originatingPaneId(env.HERDR_PLUGIN_CONTEXT_JSON);
   const herdrBin = env.HERDR_BIN_PATH ?? "herdr";
-  const target = inspectAgent(herdrBin, targetPaneId, run);
+  let sessionId = "";
+  if (targetPaneId) {
+    try {
+      const target = inspectAgent(herdrBin, targetPaneId, run);
+      sessionId = target.sessionId;
+    } catch {
+      // Non-agent pane, or agent without native session (Codex/OpenCode/raw shell)
+    }
+  }
   const result = run(herdrBin, [
     "plugin",
     "pane",
@@ -45,7 +53,7 @@ export function openPickerAction(
     "--env",
     `HERDR_PROMPTS_TARGET_PANE_ID=${targetPaneId}`,
     "--env",
-    `HERDR_PROMPTS_TARGET_AGENT_SESSION_ID=${target.sessionId}`,
+    `HERDR_PROMPTS_TARGET_AGENT_SESSION_ID=${sessionId}`,
     "--focus",
   ]);
   assertCommandSucceeded(result, "open the prompt picker");
@@ -58,17 +66,25 @@ export class HerdrClient {
   ) {}
 
   insertPrompt(target: AgentTarget, content: string): void {
-    const agent = inspectAgent(this.herdrBin, target.paneId, this.run);
-    if (agent.paneId !== target.paneId) {
-      throw new HerdrRuntimeError("Herdr returned a different target pane");
+    if (!target.paneId) {
+      throw new HerdrRuntimeError("No target pane to insert prompt into");
     }
-    if (agent.sessionId !== target.sessionId) {
-      throw new HerdrRuntimeError("The target pane now hosts a different Agent");
-    }
-    if (agent.status !== "idle" && agent.status !== "done") {
-      throw new HerdrRuntimeError(
-        `Target Agent is ${agent.status}, not idle`,
-      );
+    if (target.sessionId) {
+      try {
+        const agent = inspectAgent(this.herdrBin, target.paneId, this.run);
+        if (agent.sessionId && agent.sessionId !== target.sessionId) {
+          throw new HerdrRuntimeError("The target pane now hosts a different Agent");
+        }
+        if (agent.status !== "idle" && agent.status !== "done") {
+          throw new HerdrRuntimeError(
+            `Target Agent is ${agent.status}, not idle`,
+          );
+        }
+      } catch (err) {
+        if (err instanceof HerdrRuntimeError && (err.message.includes("different Agent") || err.message.includes("not idle"))) {
+          throw err;
+        }
+      }
     }
 
     const sendResult = this.run(this.herdrBin, [
@@ -83,21 +99,20 @@ export class HerdrClient {
 
 function originatingPaneId(serializedContext: string | undefined): string {
   if (!serializedContext) {
-    throw new HerdrRuntimeError("HERDR_PLUGIN_CONTEXT_JSON is missing");
+    return "";
   }
 
   let context: unknown;
   try {
     context = JSON.parse(serializedContext);
   } catch {
-    throw new HerdrRuntimeError("HERDR_PLUGIN_CONTEXT_JSON is invalid");
+    return "";
   }
   if (
     !isRecord(context) ||
-    typeof context.focused_pane_id !== "string" ||
-    context.focused_pane_id.length === 0
+    typeof context.focused_pane_id !== "string"
   ) {
-    throw new HerdrRuntimeError("The plugin action requires a focused pane");
+    return "";
   }
   return context.focused_pane_id;
 }

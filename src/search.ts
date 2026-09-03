@@ -1,4 +1,5 @@
 export interface PromptContent {
+  title?: string;
   content: string;
 }
 
@@ -12,6 +13,7 @@ export function searchPrompts<T extends PromptContent>(
 
   const normalizedQuery = query.toLowerCase();
   return prompts.filter((prompt) =>
+    (prompt.title && prompt.title.toLowerCase().includes(normalizedQuery)) ||
     prompt.content.toLowerCase().includes(normalizedQuery),
   );
 }
